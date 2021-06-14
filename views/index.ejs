@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<!-- Required meta tags -->
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, shrink-to-fit=no"
+		/>
+
+		<!-- Bootstrap CSS -->
+		<link
+			rel="stylesheet"
+			href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+			integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+			crossorigin="anonymous"
+		/>
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+			integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w=="
+			crossorigin="anonymous"
+			referrerpolicy="no-referrer"
+		/>
+
+		<title>Message Board</title>
+	</head>
+	<body>
+		<!-- Navbar -->
+		<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+			<a class="navbar-brand active" href="#">&copy; Pratik</a>
+			<button
+				class="navbar-toggler"
+				type="button"
+				data-toggle="collapse"
+				data-target="#navbarNavAltMarkup"
+				aria-controls="navbarNavAltMarkup"
+				aria-expanded="false"
+				aria-label="Toggle navigation"
+			>
+				<span class="navbar-toggler-icon"></span>
+			</button>
+			<div class="collapse navbar-collapse ml-md-5" id="navbarNavAltMarkup">
+				<div class="navbar-nav">
+					<a class="nav-item nav-link active" href="/logout">Log out</a>
+				</div>
+			</div>
+		</nav>
+
+		<!-- Message Board Title -->
+		<div class="container my-4">
+			<div class="bg-white text-center">
+				<% if (user) { %>
+				<span class="font-weight-bold nav-item nav-link active">
+					Welcome <%= user.userName %> !
+				</span>
+				<% } %>
+				<span class="display-4">Message Board</span>
+
+				<br />
+				<button class="btn btn-dark mt-4 font-weight-bold" id="createBtn">
+					<span>Create Post</span>
+					<i class="fas fa-plus-circle btn-lg"></i>
+				</button>
+				<!-- Create form -->
+				<form class="mt-4 d-none" id="createForm">
+					<div class="form-group">
+						<textarea
+							class="form-control input"
+							id="msg"
+							rows="3"
+							maxlength="280"
+							name="msg"
+						></textarea>
+						<div class="msg error text-danger"></div>
+						<button class="btn mt-4 btn-primary px-5 font-weight-bold btn-dark">
+							Post
+						</button>
+						<button
+							class="
+								btn
+								px-5
+								mt-4
+								btn-primary
+								font-weight-bold
+								btn-dark
+								ml-md-5
+							"
+							id="cancelBtn"
+						>
+							Cancel
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		<div class="container messages"></div>
+
+		<!-- Sending POST requestBody -->
+		<script>
+			const form = document.querySelector('#createForm');
+			const msgError = document.querySelector('.msg.error');
+
+			// To modify the date to the required format
+			const dateFormatter = (postDate) => {
+				const time =
+					postDate.getHours() < 12
+						? postDate.getHours() + ':' + postDate.getMinutes() + ' AM'
+						: 24 - postDate.getHours() + ':' + postDate.getMinutes() + ' PM';
+				return (
+					postDate.getFullYear() +
+					'/' +
+					(postDate.getMonth() + 1) +
+					'/' +
+					postDate.getDate() +
+					'  ' +
+					time
+				);
+			};
+
+			// To generate the the templates with required values placed
+			const templateGenerator = (formattedPostDate, data) => {
+				let postTemplate =
+					'<div class="jumbotron bg-white border border-dark rounded"><span class="font-weight-bold"><USERNAME></span><br /><span><MESSAGE></span><br /><div class="container text-right text-muted"><span><DATE></span></div></div></div>';
+				postTemplate = postTemplate.replace(/<DATE>/g, formattedPostDate);
+				postTemplate = postTemplate.replace(/<MESSAGE>/g, data.message);
+				postTemplate = postTemplate.replace(/<USERNAME>/g, data.userName);
+				return postTemplate;
+			};
+
+			async function loadData() {
+				// GET request to receive all the posts previously made
+				const messages = await fetch('/messages', {
+					method: 'GET',
+					mode: 'cors',
+					cache: 'default',
+					headers: { 'Content-Type': 'application/json' },
+				});
+				const allMessages = await messages.json();
+				// Inserting to the document
+				for (let i = 0; i <= allMessages.length - 1; i++) {
+					let messageObj = allMessages[i];
+					const postDate = new Date(messageObj.date);
+					const formattedPostDate = dateFormatter(postDate);
+					const postTemplate = templateGenerator(formattedPostDate, messageObj);
+					document
+						.querySelector('.messages')
+						.insertAdjacentHTML('afterbegin', postTemplate);
+				}
+			}
+
+			// Loading the data to the webpage
+			loadData();
+
+			// for POSTING the data
+			form.addEventListener('submit', async (e) => {
+				e.preventDefault();
+
+				// Resetting the values for error
+				msgError.textContent = '';
+				const msg = form.msg.value;
+
+				if (!msg) {
+					msgError.textContent = 'Empty Fields Found';
+				} else {
+					try {
+						// POST method
+						const res = await fetch('/messageBoard', {
+							method: 'POST',
+							body: JSON.stringify({ msg }),
+							headers: { 'Content-Type': 'application/json' },
+						});
+						const data = await res.json();
+						if (data.errors) {
+							msgError.textContent = data.errors.message;
+						} else {
+							const postDate = new Date(data.date);
+							const formattedPostDate = dateFormatter(postDate);
+							const postTemplate = templateGenerator(formattedPostDate, data);
+							document
+								.querySelector('.messages')
+								.insertAdjacentHTML('afterbegin', postTemplate);
+						}
+						form.msg.value = '';
+					} catch (error) {
+						console.log(error);
+					}
+				}
+			});
+		</script>
+		<!-- Optional JavaScript -->
+		<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+		<script
+			src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+			integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+			crossorigin="anonymous"
+		></script>
+		<script
+			src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+			integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+			crossorigin="anonymous"
+		></script>
+		<script
+			src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+			integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+			crossorigin="anonymous"
+		></script>
+		<script>
+			document.querySelector('#createBtn').addEventListener('click', () => {
+				document.querySelector('#createForm').classList.toggle('d-none');
+				document.querySelector('#createBtn').classList.toggle('d-none');
+			});
+			document.querySelector('#cancelBtn').addEventListener('click', (e) => {
+				e.preventDefault();
+				document.querySelector('#createForm').classList.toggle('d-none');
+				document.querySelector('#createBtn').classList.toggle('d-none');
+			});
+		</script>
+		<style>
+			.active {
+				font-weight: bold;
+			}
+		</style>
+	</body>
+</html>
